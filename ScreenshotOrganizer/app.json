@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "Screenshot Organizer",
-    "slug": "screenshot-organizer",
+    "name": "Screenshot Extractor",
+    "slug": "screenshot-extractor",
+    "owner": "rsong9527",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,11 +14,10 @@
       "backgroundColor": "#0F0F1A"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.screenshotorganizer.app",
+      "supportsTablet": false,
+      "bundleIdentifier": "com.rsong9527.screenshotextractor",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "We need access to your photo library to classify and organize your screenshots.",
-        "NSPhotoLibraryAddUsageDescription": "We need permission to create albums and organize your screenshots."
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to read and extract text from your screenshots. No photos will be modified or deleted."
       }
     },
     "android": {
@@ -28,10 +28,9 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
         "READ_MEDIA_IMAGES"
       ],
-      "package": "com.screenshotorganizer.app"
+      "package": "com.rsong9527.screenshotextractor"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,11 +39,16 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Screenshot Organizer to access your photos for classification.",
-          "savePhotosPermission": "Allow Screenshot Organizer to create albums and organize your screenshots.",
-          "isAccessMediaLocationEnabled": true
+          "photosPermission": "Allow Screenshot Extractor to read your photos so AI can extract text content. No photos will be modified or deleted.",
+          "savePhotosPermission": false,
+          "isAccessMediaLocationEnabled": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
   }
 }
