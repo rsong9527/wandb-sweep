@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View } from 'react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
-import ClassifyScreen from './src/screens/ClassifyScreen';
+import ExtractScreen from './src/screens/ClassifyScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 import { loadSettings, saveSettings } from './src/services/storage';
@@ -79,7 +79,7 @@ export default function App() {
       )}
 
       {screen === 'classify' && (
-        <ClassifyScreen
+        <ExtractScreen
           assets={assetsToClassify}
           settings={settings}
           onDone={handleDone}

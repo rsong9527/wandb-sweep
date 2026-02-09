@@ -145,12 +145,12 @@ export default function HomeScreen({
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>
-            {settings.language === 'zh' ? '截图整理' : 'Screenshot Organizer'}
+            {settings.language === 'zh' ? '截图提取器' : 'Screenshot Extractor'}
           </Text>
           <Text style={styles.subtitle}>
             {settings.language === 'zh'
-              ? 'AI 智能打标签，不删除任何照片'
-              : 'AI tagging only — nothing gets deleted'}
+              ? 'AI 读取内容，提取文字和想法'
+              : 'AI reads your screenshots, extracts text & ideas'}
           </Text>
         </View>
         <Pressable style={styles.settingsBtn} onPress={onNavigateSettings}>
@@ -173,8 +173,8 @@ export default function HomeScreen({
           <Pressable style={styles.classifyBtn} onPress={handleStart}>
             <Text style={styles.classifyBtnText}>
               {settings.language === 'zh'
-                ? `开始打标签 (${selectedIds.size} 张)`
-                : `Tag ${selectedIds.size} Photos`}
+                ? `开始提取 (${selectedIds.size} 张)`
+                : `Extract ${selectedIds.size} Screenshots`}
             </Text>
           </Pressable>
         </View>

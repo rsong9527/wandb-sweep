@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Classify Screen - shows progress and results
+// Extract Screen - shows progress and extraction results
 // ---------------------------------------------------------------------------
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -7,20 +7,16 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import ResultCard from '../components/ResultCard';
-import { classifyImage } from '../services/classifier';
-import { organizeAssetIntoAlbum, ScreenshotAsset } from '../services/mediaLibrary';
+import { extractImageContent } from '../services/classifier';
+import { ScreenshotAsset } from '../services/mediaLibrary';
 import { borderRadius, colors, fontSize, spacing } from '../utils/theme';
-import {
-  AppSettings,
-  CATEGORIES,
-  ClassificationResult,
-  getCategoryLabel,
-} from '../utils/types';
+import { AppSettings, ExtractionResult } from '../utils/types';
 
 interface Props {
   assets: ScreenshotAsset[];
@@ -28,81 +24,66 @@ interface Props {
   onDone: () => void;
 }
 
-export default function ClassifyScreen({ assets, settings, onDone }: Props) {
-  const [results, setResults] = useState<ClassificationResult[]>([]);
+export default function ExtractScreen({ assets, settings, onDone }: Props) {
+  const [results, setResults] = useState<ExtractionResult[]>([]);
   const [current, setCurrent] = useState(0);
-  const [phase, setPhase] = useState<'classifying' | 'tagging' | 'done'>(
-    'classifying',
-  );
+  const [phase, setPhase] = useState<'extracting' | 'done'>('extracting');
   const [error, setError] = useState<string | null>(null);
   const cancelled = useRef(false);
 
-  // Run classification
+  const isZh = settings.language === 'zh';
+
+  // Run extraction
   useEffect(() => {
     cancelled.current = false;
 
     (async () => {
-      const allResults: ClassificationResult[] = [];
+      const allResults: ExtractionResult[] = [];
 
       for (let i = 0; i < assets.length; i++) {
         if (cancelled.current) break;
         setCurrent(i + 1);
 
         try {
-          const { category, reason } = await classifyImage(
-            assets[i].uri,
-            settings,
-          );
-          const result: ClassificationResult = {
+          const extracted = await extractImageContent(assets[i].uri, settings);
+          const result: ExtractionResult = {
             uri: assets[i].uri,
             filename: assets[i].filename,
-            category,
-            reason,
+            tag: extracted.tag,
+            hasUsefulText: extracted.hasUsefulText,
+            extractedText: extracted.extractedText,
+            summary: extracted.summary,
+            actionable: extracted.actionable,
             timestamp: Date.now(),
           };
           allResults.push(result);
           setResults([...allResults]);
         } catch (e: any) {
-          // On error, mark as 'other' and continue
-          const result: ClassificationResult = {
+          const result: ExtractionResult = {
             uri: assets[i].uri,
             filename: assets[i].filename,
-            category: 'other',
-            reason: `Error: ${e.message?.substring(0, 50) ?? 'Unknown'}`,
+            tag: 'error',
+            hasUsefulText: false,
+            extractedText: '',
+            summary: `Error: ${e.message?.substring(0, 80) ?? 'Unknown'}`,
+            actionable: '',
             timestamp: Date.now(),
           };
           allResults.push(result);
           setResults([...allResults]);
 
-          // If it's an auth error, stop early
           if (e.message?.includes('401') || e.message?.includes('403')) {
             setError(
-              settings.language === 'zh'
+              isZh
                 ? 'API Key 无效，请检查设置'
                 : 'Invalid API key. Please check Settings.',
             );
-            return;
+            break;
           }
         }
       }
 
-      if (cancelled.current) return;
-
-      // Phase 2: tag into albums (originals are NEVER deleted or moved)
-      setPhase('tagging');
-      for (let i = 0; i < allResults.length; i++) {
-        if (cancelled.current) break;
-        const r = allResults[i];
-        const asset = assets[i];
-        const catLabel =
-          CATEGORIES.find(c => c.key === r.category)?.[
-            settings.language === 'zh' ? 'labelZh' : 'labelEn'
-          ] ?? r.category;
-
-        await organizeAssetIntoAlbum(asset.id, catLabel);
-      }
-
-      setPhase('done');
+      if (!cancelled.current) setPhase('done');
     })();
 
     return () => {
@@ -110,31 +91,69 @@ export default function ClassifyScreen({ assets, settings, onDone }: Props) {
     };
   }, []);
 
-  // Build summary stats
-  const stats: Record<string, number> = {};
+  // Build stats
+  const tagCounts: Record<string, number> = {};
+  let usefulCount = 0;
+  let actionableCount = 0;
   results.forEach(r => {
-    stats[r.category] = (stats[r.category] || 0) + 1;
+    tagCounts[r.tag] = (tagCounts[r.tag] || 0) + 1;
+    if (r.hasUsefulText) usefulCount++;
+    if (r.actionable) actionableCount++;
   });
-  const sortedStats = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+  const deletableCount = results.length - usefulCount;
+  const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
 
-  const isZh = settings.language === 'zh';
+  // Export as text
+  const handleExport = async () => {
+    let text = isZh ? '# 截图内容提取\n\n' : '# Screenshot Extraction\n\n';
+
+    // Actionable items first
+    const actionable = results.filter(r => r.actionable);
+    if (actionable.length > 0) {
+      text += isZh ? '## 行动项 / 想法\n\n' : '## Action Items / Ideas\n\n';
+      for (const r of actionable) {
+        text += `- [ ] **${r.tag}**: ${r.actionable}\n`;
+        text += `  (${r.filename})\n`;
+      }
+      text += '\n';
+    }
+
+    // All extracted text by tag
+    const byTag: Record<string, ExtractionResult[]> = {};
+    results.forEach(r => {
+      byTag[r.tag] = byTag[r.tag] || [];
+      byTag[r.tag].push(r);
+    });
+
+    for (const [tag, items] of Object.entries(byTag)) {
+      text += `## ${tag} (${items.length})\n\n`;
+      for (const item of items) {
+        text += `### ${item.filename}\n`;
+        text += `> ${item.summary}\n\n`;
+        if (item.extractedText) {
+          text += `${item.extractedText}\n\n`;
+        }
+        if (!item.hasUsefulText) {
+          text += isZh ? '*可以删除*\n\n' : '*Safe to delete*\n\n';
+        }
+      }
+    }
+
+    try {
+      await Share.share({ message: text, title: isZh ? '截图提取内容' : 'Screenshot Extractions' });
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>
-          {phase === 'classifying'
-            ? isZh
-              ? '正在识别...'
-              : 'Classifying...'
-            : phase === 'tagging'
-            ? isZh
-              ? '正在打标签...'
-              : 'Tagging into Albums...'
-            : isZh
-            ? '标签完成!'
-            : 'Tagging Done!'}
+          {phase === 'extracting'
+            ? isZh ? '正在提取内容...' : 'Extracting...'
+            : isZh ? '提取完成!' : 'Extraction Done!'}
         </Text>
 
         {phase !== 'done' && !error && (
@@ -146,7 +165,6 @@ export default function ClassifyScreen({ assets, settings, onDone }: Props) {
           </View>
         )}
 
-        {/* Progress bar */}
         <View style={styles.progressBarBg}>
           <View
             style={[
@@ -164,13 +182,35 @@ export default function ClassifyScreen({ assets, settings, onDone }: Props) {
         </View>
       )}
 
-      {/* Summary stats */}
-      {sortedStats.length > 0 && (
-        <View style={styles.statsContainer}>
-          {sortedStats.map(([key, count]) => (
-            <View key={key} style={styles.statChip}>
-              <Text style={styles.statChipText}>
-                {getCategoryLabel(key, settings.language)} {count}
+      {/* Stats summary */}
+      {results.length > 0 && (
+        <View style={styles.statsBar}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{usefulCount}</Text>
+            <Text style={styles.statLabel}>{isZh ? '有内容' : 'Useful'}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statNumber, { color: colors.warning }]}>
+              {actionableCount}
+            </Text>
+            <Text style={styles.statLabel}>{isZh ? '有想法' : 'Ideas'}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statNumber, { color: colors.danger }]}>
+              {deletableCount}
+            </Text>
+            <Text style={styles.statLabel}>{isZh ? '可删' : 'Deletable'}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Tag chips */}
+      {sortedTags.length > 0 && (
+        <View style={styles.tagsContainer}>
+          {sortedTags.map(([tag, count]) => (
+            <View key={tag} style={styles.tagChip}>
+              <Text style={styles.tagChipText}>
+                {tag} ({count})
               </Text>
             </View>
           ))}
@@ -193,15 +233,20 @@ export default function ClassifyScreen({ assets, settings, onDone }: Props) {
         <View style={styles.safetyBox}>
           <Text style={styles.safetyText}>
             {isZh
-              ? '🔒 所有原图保持不变，仅添加到相册标签中，未删除任何照片。'
-              : '🔒 All originals untouched. Photos were only added to album tags — nothing was deleted.'}
+              ? '原始截图未做任何改动。你可以根据上面的结果手动决定删哪些。'
+              : 'Originals untouched. Review results above and manually delete what you want.'}
           </Text>
         </View>
       )}
 
-      {/* Bottom button */}
+      {/* Bottom buttons */}
       {(phase === 'done' || error) && (
         <View style={styles.bottomBar}>
+          <Pressable style={styles.exportBtn} onPress={handleExport}>
+            <Text style={styles.exportBtnText}>
+              {isZh ? '导出提取内容' : 'Export Extracted Text'}
+            </Text>
+          </Pressable>
           <Pressable style={styles.doneBtn} onPress={onDone}>
             <Text style={styles.doneBtnText}>
               {isZh ? '返回首页' : 'Back to Home'}
@@ -221,7 +266,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.xxl + spacing.md,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
   },
   title: {
     color: colors.textPrimary,
@@ -263,32 +308,50 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: fontSize.md,
   },
-  statsContainer: {
+  statsBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    color: colors.success,
+    fontSize: fontSize.xl,
+    fontWeight: '800',
+  },
+  statLabel: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    marginTop: 2,
+  },
+  tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingBottom: spacing.sm,
     gap: spacing.xs,
   },
-  statChip: {
+  tagChip: {
     backgroundColor: colors.bgCard,
     borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  statChipText: {
+  tagChipText: {
     color: colors.textSecondary,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
   },
   listContent: {
     paddingHorizontal: spacing.md,
-    paddingBottom: 180,
+    paddingBottom: 200,
   },
   safetyBox: {
     marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
     backgroundColor: colors.success + '15',
     borderRadius: borderRadius.md,
     padding: spacing.md,
@@ -308,16 +371,30 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: spacing.xl + spacing.md,
     backgroundColor: colors.bgPrimary + 'F0',
+    gap: spacing.sm,
   },
-  doneBtn: {
-    backgroundColor: colors.success,
+  exportBtn: {
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  doneBtnText: {
-    color: colors.bgPrimary,
+  exportBtnText: {
+    color: '#fff',
     fontSize: fontSize.lg,
     fontWeight: '700',
+  },
+  doneBtn: {
+    backgroundColor: colors.bgCard,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  doneBtnText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    fontWeight: '600',
   },
 });
