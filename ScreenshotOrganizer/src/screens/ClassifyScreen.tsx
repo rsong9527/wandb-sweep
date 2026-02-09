@@ -31,7 +31,7 @@ interface Props {
 export default function ClassifyScreen({ assets, settings, onDone }: Props) {
   const [results, setResults] = useState<ClassificationResult[]>([]);
   const [current, setCurrent] = useState(0);
-  const [phase, setPhase] = useState<'classifying' | 'organizing' | 'done'>(
+  const [phase, setPhase] = useState<'classifying' | 'tagging' | 'done'>(
     'classifying',
   );
   const [error, setError] = useState<string | null>(null);
@@ -88,8 +88,8 @@ export default function ClassifyScreen({ assets, settings, onDone }: Props) {
 
       if (cancelled.current) return;
 
-      // Phase 2: organize into albums
-      setPhase('organizing');
+      // Phase 2: tag into albums (originals are NEVER deleted or moved)
+      setPhase('tagging');
       for (let i = 0; i < allResults.length; i++) {
         if (cancelled.current) break;
         const r = allResults[i];
@@ -126,15 +126,15 @@ export default function ClassifyScreen({ assets, settings, onDone }: Props) {
         <Text style={styles.title}>
           {phase === 'classifying'
             ? isZh
-              ? '正在分类...'
+              ? '正在识别...'
               : 'Classifying...'
-            : phase === 'organizing'
+            : phase === 'tagging'
             ? isZh
-              ? '正在整理相册...'
-              : 'Organizing Albums...'
+              ? '正在打标签...'
+              : 'Tagging into Albums...'
             : isZh
-            ? '完成!'
-            : 'Done!'}
+            ? '标签完成!'
+            : 'Tagging Done!'}
         </Text>
 
         {phase !== 'done' && !error && (
@@ -187,6 +187,17 @@ export default function ClassifyScreen({ assets, settings, onDone }: Props) {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
+
+      {/* Safety notice */}
+      {phase === 'done' && (
+        <View style={styles.safetyBox}>
+          <Text style={styles.safetyText}>
+            {isZh
+              ? '🔒 所有原图保持不变，仅添加到相册标签中，未删除任何照片。'
+              : '🔒 All originals untouched. Photos were only added to album tags — nothing was deleted.'}
+          </Text>
+        </View>
+      )}
 
       {/* Bottom button */}
       {(phase === 'done' || error) && (
@@ -273,7 +284,21 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.md,
-    paddingBottom: 120,
+    paddingBottom: 180,
+  },
+  safetyBox: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.success + '15',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.success + '30',
+  },
+  safetyText: {
+    color: colors.success,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
   },
   bottomBar: {
     position: 'absolute',

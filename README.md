@@ -6,9 +6,9 @@ AI-powered screenshot classifier. Scans a folder of screenshots, uses a vision L
 
 - **Vision AI Classification** - Uses GPT-4o or Claude to actually *look at* the screenshot content
 - **Smart Categories** - Receipts, chats, memes, code, shopping, junk, etc.
-- **Dry Run Mode** - Preview what will happen before moving any files
+- **Tag Only, Never Delete** - Originals are NEVER modified, moved, or deleted
+- **Dry Run Mode** - Preview what will happen before copying any files
 - **Bilingual** - English and Chinese category names and prompts
-- **Copy or Move** - Choose to copy (safe) or move (clean up originals)
 - **Classification Log** - Saves a JSON log of every classification decision
 
 ## Quick Start
@@ -43,19 +43,20 @@ python screenshot_organizer.py <input_folder> [options]
 | `-l, --language` | `en` or `zh` | `en` |
 | `--dry-run` | Preview only, no file changes | off |
 | `-r, --recursive` | Scan subfolders too | off |
-| `--move` | Move files instead of copy | copy |
+
+> **Safe by design**: Originals are always preserved. Files are only copied into tagged folders.
 
 ### Examples
 
 ```bash
-# Preview without moving (recommended first step)
+# Preview without copying (recommended first step)
 python screenshot_organizer.py ~/Screenshots --dry-run
 
 # Chinese categories, using Claude
 python screenshot_organizer.py ~/Screenshots --provider anthropic --language zh
 
-# Move files (clean up originals) with custom output
-python screenshot_organizer.py ~/Screenshots -o ~/Organized --move
+# Custom output folder
+python screenshot_organizer.py ~/Screenshots -o ~/Organized
 
 # Use a cheaper/faster model
 python screenshot_organizer.py ~/Screenshots --model gpt-4o-mini
@@ -93,8 +94,9 @@ python screenshot_organizer.py ~/Screenshots -r --dry-run
 1. Scans the input folder for image files (png, jpg, webp, gif, bmp, tiff)
 2. Sends each image to the vision LLM with a classification prompt
 3. The model returns a category and brief reason
-4. Files are copied/moved into category subfolders
+4. Files are **copied** (never moved/deleted) into category subfolders
 5. A `classification_log.json` is saved with all decisions
+6. **Original files remain completely untouched**
 
 ## Output Structure
 

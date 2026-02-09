@@ -1,5 +1,7 @@
 // ---------------------------------------------------------------------------
-// Media Library Service - read screenshots, create albums, move photos
+// Media Library Service - read screenshots, create albums, tag photos
+// NOTE: This service NEVER deletes or moves original photos.
+// It only adds photos to albums (tags). Originals stay untouched.
 // ---------------------------------------------------------------------------
 
 import * as MediaLibrary from 'expo-media-library';

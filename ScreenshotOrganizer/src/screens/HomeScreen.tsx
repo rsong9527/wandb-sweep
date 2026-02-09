@@ -149,8 +149,8 @@ export default function HomeScreen({
           </Text>
           <Text style={styles.subtitle}>
             {settings.language === 'zh'
-              ? 'AI 帮你自动分类截图'
-              : 'AI-powered screenshot sorter'}
+              ? 'AI 智能打标签，不删除任何照片'
+              : 'AI tagging only — nothing gets deleted'}
           </Text>
         </View>
         <Pressable style={styles.settingsBtn} onPress={onNavigateSettings}>
@@ -173,8 +173,8 @@ export default function HomeScreen({
           <Pressable style={styles.classifyBtn} onPress={handleStart}>
             <Text style={styles.classifyBtnText}>
               {settings.language === 'zh'
-                ? `开始分类 (${selectedIds.size} 张)`
-                : `Classify ${selectedIds.size} Photos`}
+                ? `开始打标签 (${selectedIds.size} 张)`
+                : `Tag ${selectedIds.size} Photos`}
             </Text>
           </Pressable>
         </View>

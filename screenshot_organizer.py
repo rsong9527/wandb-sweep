@@ -263,7 +263,6 @@ def organize_screenshots(
     language: str = "en",
     dry_run: bool = False,
     recursive: bool = False,
-    move: bool = False,
 ) -> dict:
     """
     Main function: classify and organize screenshots.
@@ -275,9 +274,10 @@ def organize_screenshots(
         api_key:       API key. Falls back to env vars OPENAI_API_KEY / ANTHROPIC_API_KEY.
         model:         Model name override.
         language:      "en" or "zh" for prompt/category language.
-        dry_run:       If True, only print what would happen without moving files.
+        dry_run:       If True, only print what would happen without copying files.
         recursive:     If True, scan subfolders too.
-        move:          If True, move files instead of copying.
+
+    NOTE: This tool ONLY tags/copies. Original files are NEVER deleted or moved.
 
     Returns:
         dict with stats: {category: count, ...}
@@ -319,7 +319,8 @@ def organize_screenshots(
         print(f"No images found in {input_folder}")
         return {}
 
-    print(f"Found {len(images)} images to classify.\n")
+    print(f"Found {len(images)} images to classify.")
+    print("NOTE: Tag-only mode. Originals will NOT be deleted or moved.\n")
 
     # Output folder
     if output_folder is None:
@@ -360,13 +361,12 @@ def organize_screenshots(
             "reason": reason,
         })
 
-        # Move or copy file
+        # Copy file into tagged folder (originals are NEVER deleted)
         dest_dir = Path(output_folder) / category
         dest_path = dest_dir / filename
 
         if dry_run:
-            action = "MOVE" if move else "COPY"
-            tqdm.write(f"  [{action}] {filename} -> {category}/ ({reason})")
+            tqdm.write(f"  [TAG] {filename} -> {category}/ ({reason})")
         else:
             dest_dir.mkdir(parents=True, exist_ok=True)
             # Handle name collision
@@ -378,10 +378,7 @@ def organize_screenshots(
                     dest_path = dest_dir / f"{stem}_{counter}{suffix}"
                     counter += 1
 
-            if move:
-                shutil.move(img_path, dest_path)
-            else:
-                shutil.copy2(img_path, dest_path)
+            shutil.copy2(img_path, dest_path)
             tqdm.write(f"  {filename} -> {category}/ ({reason})")
 
     # Print summary
@@ -398,14 +395,16 @@ def organize_screenshots(
     print(f"\n  Total: {len(images)} files")
     if dry_run:
         if language == "zh":
-            print("\n  [试运行模式] 没有文件被移动/复制。去掉 --dry-run 来真正执行。")
+            print("\n  [试运行模式] 没有文件被复制。去掉 --dry-run 来真正执行。")
         else:
-            print("\n  [DRY RUN] No files were moved/copied. Remove --dry-run to execute.")
+            print("\n  [DRY RUN] No files were copied. Remove --dry-run to execute.")
     else:
         if language == "zh":
-            print(f"\n  文件已整理到: {output_folder}")
+            print(f"\n  文件已标签归类到: {output_folder}")
+            print("  原始文件未做任何改动。")
         else:
-            print(f"\n  Files organized into: {output_folder}")
+            print(f"\n  Files tagged into: {output_folder}")
+            print("  Original files were NOT modified or deleted.")
 
     # Save classification log
     if not dry_run:
@@ -429,15 +428,17 @@ def main():
         description="Screenshot Organizer - AI-powered screenshot classifier",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
+NOTE: This tool only TAGS (copies into folders). Originals are NEVER deleted.
+
 Examples:
-  # Basic usage (OpenAI, English, copy mode)
+  # Basic usage (OpenAI, English)
   python screenshot_organizer.py ~/Screenshots
 
-  # Preview without moving files
+  # Preview without copying files
   python screenshot_organizer.py ~/Screenshots --dry-run
 
-  # Use Claude, Chinese labels, move instead of copy
-  python screenshot_organizer.py ~/Screenshots --provider anthropic --language zh --move
+  # Use Claude with Chinese labels
+  python screenshot_organizer.py ~/Screenshots --provider anthropic --language zh
 
   # Custom output folder and model
   python screenshot_organizer.py ~/Screenshots -o ~/Organized --model gpt-4o-mini
@@ -481,17 +482,12 @@ Examples:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Preview classification without moving/copying files",
+        help="Preview classification without copying files",
     )
     parser.add_argument(
         "--recursive", "-r",
         action="store_true",
         help="Scan subfolders recursively",
-    )
-    parser.add_argument(
-        "--move",
-        action="store_true",
-        help="Move files instead of copying (default: copy)",
     )
 
     args = parser.parse_args()
@@ -510,7 +506,6 @@ Examples:
         language=args.language,
         dry_run=args.dry_run,
         recursive=args.recursive,
-        move=args.move,
     )
 
 
